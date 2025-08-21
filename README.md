@@ -7,7 +7,9 @@
 `command: systeminfo`  
 
 ## I need an EXE instead of a PS1?
-Use https://github.com/MScholtes/PS2EXE to convert to EXE
+Use https://github.com/MScholtes/PS2EXE to convert to EXE.  
+  
+Sadly, this powershell script can't properly work after conversion to EXE.  
 
 ## I need shellcode instead of a PS1?
 Use https://github.com/MScholtes/PS2EXE to convert to EXE  

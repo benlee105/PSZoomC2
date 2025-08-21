@@ -4,7 +4,9 @@ See [Releases](https://github.com/benlee105/PSZoomC2/releases).
 There's PowerShell, Bash and C# versions!
 
 ## What are the pre-requisites and setup required?
-You'll need a Zoom account, and create a Zoom app on Zoom's website (its super easy!).  
+You'll need a Zoom account, create a Zoom app on Zoom's website (its super easy!) and have [Zoom Workplace](https://zoom.us/download) installed.  
+  
+You'll need to furnish the Zoom App info into the code of your choice.
   
 See [**Workflow Wiki**](https://github.com/benlee105/PSZoomC2/wiki/Workflow) for step by step instructions on setup.
 

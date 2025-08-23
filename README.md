@@ -26,5 +26,7 @@ See [**Usage Wiki**](https://github.com/benlee105/PSZoomC2/wiki/Usage) for step 
 ## I need shellcode instead of PowerShell, Bash or C# EXE?
 Download the C# version, compile into EXE, then use https://github.com/TheWover/donut to convert to shellcode.
 
+donut.exe -i <C2.exe> -f 7 -o C2.bin
+
 ## I need a shellcode loader?
 TBD

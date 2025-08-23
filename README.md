@@ -27,6 +27,8 @@ See [**Usage Wiki**](https://github.com/benlee105/PSZoomC2/wiki/Usage) for step 
 Download the C# version, compile into EXE, then use https://github.com/TheWover/donut to convert to shellcode.
 
 donut.exe -i <C2.exe> -f 7 -o C2.bin
+  
+Unfortunately, this didn't seem to work with my AppDomain Injection shellcode loader :( 23-Aug-2025 
 
 ## I need a shellcode loader?
 TBD
